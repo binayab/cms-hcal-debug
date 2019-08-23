@@ -22,6 +22,7 @@
 // system include files
 #include <memory>
 #include <array>
+#include <vector>
 #include <algorithm>
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -113,11 +114,14 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       TTree *matches_;
 
       double tp_energy_;
+      int tp_ts_adc_[8] = {0};
       int tp_ieta_;
       int tp_iphi_;
       int tp_depth_max_;
       int tp_depth_start_;
       int tp_depth_end_;
+      int tp_depth_;
+      int tp_event_;
 
       int tp_soi_;
       double tpsplit_energy_;
@@ -128,17 +132,38 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       int tpsplit_iphi_;
       int tpsplit_depth_;
       double tpsplit_ettot_;
+      int tpsplit_bx_;
+      int tpsplit_event_;
+
 
       double tpsplit_rise_avg_;
       double tpsplit_rise_rms_;
       double tpsplit_fall_avg_;
       double tpsplit_fall_rms_;
 
-  double ev_rh_energy0_;    
+      double ev_rh_energy0_;    
       double ev_rh_energy_;
       double ev_tp_energy_;
       int ev_rh_unmatched_;
       int ev_tp_unmatched_;
+      int ev_tp_event_;
+      std::vector<int> ev_tp_ieta_;
+      std::vector<int> ev_tp_iphi_;
+      std::vector<double> ev_tp_et_;
+      std::vector<int> ev_tp_soi_;
+      std::vector<int> ev_tp_ts0_;
+      std::vector<int> ev_tp_ts1_;
+      std::vector<int> ev_tp_ts2_;
+      std::vector<int> ev_tp_ts3_;
+      std::vector<int> ev_tp_ts4_;
+      std::vector<int> ev_tp_ts5_;
+      std::vector<int> ev_tp_ts6_;
+      std::vector<int> ev_tp_ts7_;
+
+      //std::vector<int> maxSum05_ = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      //                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      //                           0, 0, 0, 0, 0, 0, 0};
+
   //      int ev_nvtx_;
 
       double mt_rh_energy0_;
@@ -151,6 +176,8 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       int mt_ieta_;
       int mt_iphi_;
       int mt_tp_soi_;
+      int mt_bx_;
+      int mt_event_;
 
   bool swap_iphi_;
 
@@ -198,6 +225,9 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
    tps_->Branch("depth_start", &tp_depth_start_);
    tps_->Branch("depth_end", &tp_depth_end_);
    tps_->Branch("soi", &tp_soi_);
+   tps_->Branch("ts_adc", &tp_ts_adc_, "ts_adc[8]/I");
+   tps_->Branch("depth", &tp_depth_);
+   tps_->Branch("event", &tp_event_);
 
    tpsplit_ = fs->make<TTree>("tpsplit", "Trigger primitives");
    tpsplit_->Branch("et", &tpsplit_energy_);
@@ -208,6 +238,8 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
    tpsplit_->Branch("etsum", &tpsplit_ettot_);
    tpsplit_->Branch("soi", &tp_soi_);
    //   tpsplit_->Branch("nvtx", &ev_nvtx_);
+   tpsplit_->Branch("event", &tpsplit_event_);
+   tpsplit_->Branch("bx", &tpsplit_bx_);
    
    tpsplit_->Branch("rise_avg", &tpsplit_rise_avg_);
    tpsplit_->Branch("rise_rms", &tpsplit_rise_rms_);
@@ -220,6 +252,19 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
    events_->Branch("TP_energy", &ev_tp_energy_);
    events_->Branch("RH_unmatched", &ev_rh_unmatched_);
    events_->Branch("TP_unmatched", &ev_tp_unmatched_);
+   events_->Branch("ieta", &ev_tp_ieta_);
+   events_->Branch("iphi", &ev_tp_iphi_);
+   events_->Branch("soi", &ev_tp_soi_);
+   events_->Branch("et", &ev_tp_et_);
+   events_->Branch("ts0", &ev_tp_ts0_);
+   events_->Branch("ts1", &ev_tp_ts1_);
+   events_->Branch("ts2", &ev_tp_ts2_);
+   events_->Branch("ts3", &ev_tp_ts3_);
+   events_->Branch("ts4", &ev_tp_ts4_);
+   events_->Branch("ts5", &ev_tp_ts5_);
+   events_->Branch("ts6", &ev_tp_ts6_);
+   events_->Branch("ts7", &ev_tp_ts7_);
+   events_->Branch("event", &ev_tp_event_);
 
    matches_ = fs->make<TTree>("matches", "Matched RH and TP");
    matches_->Branch("RH_energyM0", &mt_rh_energy0_);
@@ -231,6 +276,9 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
    matches_->Branch("ieta", &mt_ieta_);
    matches_->Branch("iphi", &mt_iphi_);
    matches_->Branch("tp_soi", &mt_tp_soi_);
+   matches_->Branch("bx", &mt_bx_);
+   matches_->Branch("event", &mt_event_);
+
 }
 
 HcalCompareUpgradeChains::~HcalCompareUpgradeChains() {}
@@ -270,6 +318,9 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
    // ==========
    // Dataframes
    // ==========
+
+   mt_bx_ = event.bunchCrossing(); tpsplit_bx_ = mt_bx_;
+   mt_event_ = event.id().event(); tpsplit_event_ = mt_event_; tp_event_ = mt_event_; ev_tp_event_ = mt_event_;
    
    Handle<QIE11DigiCollection> frames;
    Handle<QIE10DigiCollection> hfframes;
@@ -418,7 +469,20 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
    // setup.get<L1RCTParametersRcd>().get(rct);
    // const L1RCTParameters* r = rct.product();
 
+   ev_tp_et_.clear();
+   ev_tp_soi_.clear();
+   ev_tp_ieta_.clear();
+   ev_tp_iphi_.clear();
+   ev_tp_ts0_.clear();
+   ev_tp_ts1_.clear();
+   ev_tp_ts2_.clear();
+   ev_tp_ts3_.clear();
+   ev_tp_ts4_.clear();
+   ev_tp_ts5_.clear();
+   ev_tp_ts6_.clear();
+   ev_tp_ts7_.clear();
    for (const auto& digi: *digis) {
+
       HcalTrigTowerDetId id = digi.id();
       //      ev_tp_energy_ += decoder->hcaletValue(id.ieta(), id.iphi(), digi.SOI_compressedEt());
       id = HcalTrigTowerDetId(id.ieta(), id.iphi(), 1, id.version());
@@ -437,6 +501,7 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
 
       //      if(tp_energy_<=0.5) continue; 
 
+
       std::vector<int> energy_depth = digi.getDepthData();
       for (int i = 0; i < static_cast<int>(energy_depth.size()); ++i) {
          int depth = energy_depth[i];
@@ -453,6 +518,62 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
       }
 
       tp_soi_ = digi.SOI_compressedEt();
+      tp_depth_ = 1;
+
+      //float ts_sum = 0.;
+      memset(tp_ts_adc_, 0, sizeof(tp_ts_adc_));
+      std::vector<int> ts_adc = digi.getSampleData();
+      //for (int i = 0; i < static_cast<int>(adc_ts.size()); i++) {
+      //  ts_sum = ts_sum + energy_ts[i];
+      //}
+     
+      ev_tp_et_.push_back(decoder->hcaletValue(id, digi.SOI_compressedEt()));
+      ev_tp_soi_.push_back(digi.SOI_compressedEt());
+      ev_tp_ieta_.push_back(id.ieta());
+      ev_tp_iphi_.push_back(id.iphi());
+      // HF TPs with have empty 8TS vector, fill with 0s to avoid out-of-bounds problems
+      if (ts_adc.size() == 0) {
+          ev_tp_ts0_.push_back(0);
+          ev_tp_ts1_.push_back(0);
+          ev_tp_ts2_.push_back(0);
+          ev_tp_ts3_.push_back(0);
+          ev_tp_ts4_.push_back(0);
+          ev_tp_ts5_.push_back(0);
+          ev_tp_ts6_.push_back(0);
+          ev_tp_ts7_.push_back(0);
+      } else {
+          ev_tp_ts0_.push_back(ts_adc[0]);
+          ev_tp_ts1_.push_back(ts_adc[1]);
+          ev_tp_ts2_.push_back(ts_adc[2]);
+          ev_tp_ts3_.push_back(ts_adc[3]);
+          ev_tp_ts4_.push_back(ts_adc[4]);
+          ev_tp_ts5_.push_back(ts_adc[5]);
+          ev_tp_ts6_.push_back(ts_adc[6]);
+          ev_tp_ts7_.push_back(ts_adc[7]);
+
+          //if (tp_energy_ == 4.5)
+          //    if (ts_adc[3]+ts_adc[4] > maxSum05_[abs(id.ieta())])
+          //        maxSum05_[abs(id.ieta())] = ts_adc[3]+ts_adc[4];
+
+          //if (abs(id.ieta()) == 1 ) //&& tp_energy_ > 0.5)
+          //    std::cout << "event " << mt_event_ << " | ieta " << id.ieta() << " | iphi " << id.iphi() << " | et " << tp_energy_ << " | SOI+SOI+1 ADC " << ts_adc[3]+ts_adc[4] << " | 8TS [" << ts_adc[0] << ", " << ts_adc[1] << ", " << ts_adc[2] << ", " << ts_adc[3] << ", " << ts_adc[4] << ", " << ts_adc[5] << ", " << ts_adc[6] << ", " << ts_adc[7] << "]" << std::endl;
+
+      }
+
+      //if (tp_energy_ > 0.5 && tp_event_ == 651 && tp_iphi_ == 54) { std::cout << "(" << tp_event_ << ", " << tp_ieta_ << ", " << tp_iphi_ << ")" << std::endl; }
+      for (int i = 0; i < static_cast<int>(ts_adc.size()); i++) {
+        //if (ts_sum == 0) {
+        //    tp_ts_energy_[i] = 0.0;
+        //} else {
+            //tp_ts_energy_[i] = float(tp_energy_) * float(energy_ts[i]) / float(ts_sum);
+            tp_ts_adc_[i] = ts_adc[i];
+
+        //}
+
+        //if (tp_energy_ > 0.5 && tp_event_ == 651 && tp_iphi_ == 54) { std::cout << "    TS" << i << " ET: " << float(tp_energy_) << " * " << float(energy_ts[i]) << " / " << float(ts_sum) << " = " << tp_ts_energy_ << std::endl; }
+
+      }
+
       tps_->Fill();
 
       if (et_sum > 0) {
@@ -475,6 +596,10 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
          }
       }
    }
+
+   //for (unsigned int ieta = 0; ieta < maxSum05_.size(); ieta++)
+   //    std::cout << " | " <<  ieta << " => " << maxSum05_[ieta];
+   //std::cout << std::endl;
 
    for (const auto& pair: tpdigis) {
 
