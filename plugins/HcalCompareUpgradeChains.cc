@@ -160,10 +160,6 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       std::vector<int> ev_tp_ts6_;
       std::vector<int> ev_tp_ts7_;
 
-      //std::vector<int> maxSum05_ = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      //                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      //                           0, 0, 0, 0, 0, 0, 0};
-
   //      int ev_nvtx_;
 
       double mt_rh_energy0_;
@@ -531,7 +527,6 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
       ev_tp_soi_.push_back(digi.SOI_compressedEt());
       ev_tp_ieta_.push_back(id.ieta());
       ev_tp_iphi_.push_back(id.iphi());
-      // HF TPs with have empty 8TS vector, fill with 0s to avoid out-of-bounds problems
       if (ts_adc.size() == 0) {
           ev_tp_ts0_.push_back(0);
           ev_tp_ts1_.push_back(0);
@@ -551,28 +546,9 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
           ev_tp_ts6_.push_back(ts_adc[6]);
           ev_tp_ts7_.push_back(ts_adc[7]);
 
-          //if (tp_energy_ == 4.5)
-          //    if (ts_adc[3]+ts_adc[4] > maxSum05_[abs(id.ieta())])
-          //        maxSum05_[abs(id.ieta())] = ts_adc[3]+ts_adc[4];
-
-          //if (abs(id.ieta()) == 1 ) //&& tp_energy_ > 0.5)
-          //    std::cout << "event " << mt_event_ << " | ieta " << id.ieta() << " | iphi " << id.iphi() << " | et " << tp_energy_ << " | SOI+SOI+1 ADC " << ts_adc[3]+ts_adc[4] << " | 8TS [" << ts_adc[0] << ", " << ts_adc[1] << ", " << ts_adc[2] << ", " << ts_adc[3] << ", " << ts_adc[4] << ", " << ts_adc[5] << ", " << ts_adc[6] << ", " << ts_adc[7] << "]" << std::endl;
-
       }
 
-      //if (tp_energy_ > 0.5 && tp_event_ == 651 && tp_iphi_ == 54) { std::cout << "(" << tp_event_ << ", " << tp_ieta_ << ", " << tp_iphi_ << ")" << std::endl; }
-      for (int i = 0; i < static_cast<int>(ts_adc.size()); i++) {
-        //if (ts_sum == 0) {
-        //    tp_ts_energy_[i] = 0.0;
-        //} else {
-            //tp_ts_energy_[i] = float(tp_energy_) * float(energy_ts[i]) / float(ts_sum);
-            tp_ts_adc_[i] = ts_adc[i];
-
-        //}
-
-        //if (tp_energy_ > 0.5 && tp_event_ == 651 && tp_iphi_ == 54) { std::cout << "    TS" << i << " ET: " << float(tp_energy_) << " * " << float(energy_ts[i]) << " / " << float(ts_sum) << " = " << tp_ts_energy_ << std::endl; }
-
-      }
+      for (int i = 0; i < static_cast<int>(ts_adc.size()); i++) { tp_ts_adc_[i] = ts_adc[i]; }
 
       tps_->Fill();
 
@@ -597,10 +573,6 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
       }
    }
 
-   //for (unsigned int ieta = 0; ieta < maxSum05_.size(); ieta++)
-   //    std::cout << " | " <<  ieta << " => " << maxSum05_[ieta];
-   //std::cout << std::endl;
-
    for (const auto& pair: tpdigis) {
 
     //printf("************************************************************\n");
@@ -624,6 +596,7 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
        memset(mt_tp_energy_depth_, 0, sizeof(mt_tp_energy_depth_));
        mt_tp_soi_ = 0;
        for (const auto& tp: pair.second) {
+
 	 mt_tp_energy_ += decoder->hcaletValue( new_id, tp.SOI_compressedEt());
 	 std::vector<int> energy_depth = tp.getDepthData();
 	 for (int i = 0; i < static_cast<int>(energy_depth.size()); ++i)
@@ -632,6 +605,7 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
 	   }
 	 mt_tp_soi_ = tp.SOI_compressedEt();
        }
+
        double sum = 0;
        std::for_each(mt_tp_energy_depth_, mt_tp_energy_depth_ + 8, [&](double &i){ sum += i; });
        std::for_each(mt_tp_energy_depth_, mt_tp_energy_depth_ + 8, [=](double &i){ 
