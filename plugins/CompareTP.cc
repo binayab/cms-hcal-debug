@@ -55,6 +55,7 @@
 #include "DataFormats/CaloTowers/interface/CaloTower.h"
 #include "DataFormats/HcalDigi/interface/HcalDigiCollections.h"
 #include "DataFormats/HcalDigi/interface/HcalTriggerPrimitiveDigi.h"
+#include "DataFormats/HcalDigi/interface/HcalUpgradeTriggerPrimitiveDigi.h"  
 #include "DataFormats/HcalDetId/interface/HcalTrigTowerDetId.h"
 #include "DataFormats/HcalDetId/interface/HcalDetId.h"
 #include "DataFormats/L1CaloTrigger/interface/L1CaloCollections.h"
@@ -123,7 +124,7 @@ CompareTP::CompareTP(const edm::ParameterSet& config) :
    edm::Service<TFileService> fs;
 
    consumes<HcalTrigPrimDigiCollection>(digis_);
-   consumes<HcalTrigPrimDigiCollection>(edigis_);
+   consumes<HcalUpgradeTrigPrimDigiCollection>(edigis_);
 
    tps_ = fs->make<TTree>("tps", "Trigger primitives");
    tps_->Branch("run", &run_);
@@ -180,7 +181,7 @@ CompareTP::analyze(const edm::Event& event, const edm::EventSetup& setup)
       return;
    }
 
-   Handle<HcalTrigPrimDigiCollection> edigis;
+   Handle<HcalUpgradeTrigPrimDigiCollection> edigis;
    if (!event.getByLabel(edigis_, edigis)) {
       LogError("CompareTP") <<
          "Can't find emulated hcal trigger primitive digi collection with tag '" <<
@@ -193,8 +194,9 @@ CompareTP::analyze(const edm::Event& event, const edm::EventSetup& setup)
 
    std::unordered_set<HcalTrigTowerDetId> ids;
    typedef std::unordered_map<HcalTrigTowerDetId, HcalTriggerPrimitiveDigi> digi_map;
+   typedef std::unordered_map<HcalTrigTowerDetId, HcalUpgradeTriggerPrimitiveDigi> digi_map_emul;
    digi_map ds;
-   digi_map eds;
+   digi_map_emul eds;
 
    for (const auto& digi: *digis) {
       ids.insert(digi.id());
@@ -214,6 +216,7 @@ CompareTP::analyze(const edm::Event& event, const edm::EventSetup& setup)
       tp_depth_ = id.depth();
       tp_version_ = id.version();
       digi_map::const_iterator digi;
+      digi_map_emul::const_iterator edigi;
       if ((digi = ds.find(id)) != ds.end()) {
          tp_soi_ = digi->second.SOI_compressedEt();
          tp_npresamples_ = digi->second.presamples();
@@ -240,15 +243,15 @@ CompareTP::analyze(const edm::Event& event, const edm::EventSetup& setup)
          else
             new_id = HcalTrigTowerDetId(id.ieta(), (id.iphi() + 2) % 72 , id.depth(), id.version());
       }
-      if ((digi = eds.find(new_id)) != eds.end()) {
-         tp_soi_emul_ = digi->second.SOI_compressedEt();
-         tp_npresamples_emul_ = digi->second.presamples();
-         tp_zsMarkAndPass_emul_ = digi->second.zsMarkAndPass();
-         tp_et_emul_ = decoder->hcaletValue(id, digi->second.t0());
+      if ((edigi = eds.find(new_id)) != eds.end()) {
+         tp_soi_emul_ = edigi->second.SOI_compressedEt();
+         tp_npresamples_emul_ = edigi->second.presamples();
+         tp_zsMarkAndPass_emul_ = edigi->second.zsMarkAndPass();
+         tp_et_emul_ = decoder->hcaletValue(id, edigi->second.SOI_compressedEt());
          for (unsigned int i = 0; i < tp_fg_emul_.size(); ++i)
-            tp_fg_emul_[i] = digi->second.t0().fineGrain(i);
+            tp_fg_emul_[i] = edigi->second.t0().fineGrain();
          for (unsigned int i = 0; i < tp_adc_emul_.size(); ++i)
-            tp_adc_emul_[i] = digi->second[i].compressedEt();
+            tp_adc_emul_[i] = edigi->second[i].compressedEt();
       } else {
          tp_soi_emul_ = 0;
          tp_npresamples_emul_ = 0;
